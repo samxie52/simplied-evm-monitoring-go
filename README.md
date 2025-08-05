@@ -136,7 +136,7 @@ go mod tidy
 
 4. **运行应用**
 ```bash
-go run cmd/main.go
+go run cmd/mvp/main.go
 ```
 
 5. **访问服务**
@@ -165,7 +165,7 @@ GET /api/stats
 ### 本地开发
 ```bash
 # 运行应用
-go run cmd/main.go
+go run cmd/mvp/main.go
 
 # 代码格式化
 go fmt ./...
@@ -177,7 +177,7 @@ go test ./...
 ### 构建部署
 ```bash
 # 构建可执行文件
-go build -o blockchain-monitor cmd/main.go
+go build -o blockchain-monitor cmd/mvp/main.go
 
 # 运行
 ./blockchain-monitor
