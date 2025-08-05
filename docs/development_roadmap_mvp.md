@@ -17,14 +17,14 @@
 **前置条件**: 无
 **输入依赖**: Go 1.24.4, Git
 **实现内容**:
-- 初始化 Go 模块和依赖管理 (`go mod init blockchain-monitor-mvp`)
+- 初始化 Go 模块和依赖管理 (`go mod init simplified-evm-monitoring-go`)
 - 创建MVP项目目录结构 (简化版 cmd/, internal/, pkg/)
 - 配置 Git 仓库和 .gitignore (Go 特定忽略规则)
 - 创建基础的 Makefile (build, test, clean, run 命令)
 - 创建 README.md MVP版本结构
 **输出交付**:
 ```
-blockchain-monitor-mvp/
+simplified-evm-monitoring-go/
 ├── cmd/mvp
 │   └── main.go                    # 应用程序入口
 ├── internal/
