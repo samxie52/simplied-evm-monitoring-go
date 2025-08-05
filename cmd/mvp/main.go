@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"simplied-evm-monitoring-go/internal/config"
 	"simplied-evm-monitoring-go/internal/services/ethereum"
 	"simplied-evm-monitoring-go/pkg/logger"
+	"syscall"
 	"time"
 )
 
@@ -26,12 +30,27 @@ func main() {
 		return
 	}
 
-	client, err := ethereum.NewClient(&cfg.Ethereum)
+	// 等待服务优雅关闭
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client, err := ethereum.NewClient(&cfg.Ethereum, ctx)
 	if err != nil {
 		logger.Error("Failed to create Ethereum client:", err)
 		return
 	}
 	defer client.Close()
+
+	gasService := ethereum.NewGasService(client)
+
+	stats, err := gasService.AnalyzeRecentBlocks(10)
+	if err != nil {
+		logger.Error("Failed to analyze recent blocks:", err)
+		return
+	}
+	logger.WithFields(map[string]interface{}{
+		"stats": stats,
+	}).Info("Gas Price Stats:")
 
 	logger.WithFields(map[string]interface{}{
 		"app_name":  cfg.App.Name,
@@ -40,4 +59,18 @@ func main() {
 		"timestamp": time.Now().Format("2006-01-02 15:04:05"),
 	}).Info("Start Simplified EVM Monitoring...")
 
+	// 监听系统信号
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// 等待停止信号
+	<-sigChan
+	logger.Info("收到停止信号，正在关闭服务...")
+
+	select {
+	case <-ctx.Done():
+		logger.Info("服务关闭")
+	case <-time.After(1 * time.Second):
+		logger.Info("服务关闭")
+	}
 }
