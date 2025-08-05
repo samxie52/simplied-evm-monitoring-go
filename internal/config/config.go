@@ -4,6 +4,15 @@ import (
 	"time"
 )
 
+// ClientType 定义客户端连接类型
+type EthereumClientType string
+
+const (
+	EthereumClientTypeHTTP      EthereumClientType = "http"      // HTTP连接
+	EthereumClientTypeWebSocket EthereumClientType = "websocket" // WebSocket连接
+	EthereumClientTypeIPC       EthereumClientType = "ipc"       // IPC连接
+)
+
 // Config 应用程序配置结构
 type Config struct {
 	// 应用程序配置
@@ -36,16 +45,24 @@ type AppConfig struct {
 
 // EthereumConfig 以太坊配置
 type EthereumConfig struct {
-	// 以太坊RPC URL
-	RPCURL string `json:"rpc_url" env:"ETH_RPC_URL" validate:"required"`
-	// 以太坊HTTP URL
-	HTTPURL string `json:"http_url" env:"ETH_HTTP_URL" validate:"required,url"`
+	// 以太坊URL
+	URL string `json:"url" env:"ETH_URL" validate:"required"`
+	// 以太坊连接类型
+	ClientType EthereumClientType `json:"client_type" env:"ETH_CLIENT_TYPE" validate:"required,oneof=http websocket ipc"`
 	// 以太坊网络
 	Network string `json:"network" env:"ETH_NETWORK" validate:"required,oneof=mainnet goerli sepolia"`
 	// 以太坊链ID
 	ChainID int64 `json:"chain_id" env:"ETH_CHAIN_ID" validate:"required"`
 	// 以太坊超时时间
-	Timeout time.Duration `json:"timeout" env:"ETH_TIMEOUT"`
+	Timeout int64 `json:"timeout" env:"ETH_TIMEOUT"`
+	// 以太坊最大并发数
+	MaxConcurrency int `json:"max_concurrency" env:"ETH_MAX_CONCURRENCY" validate:"min=1"`
+	// 以太坊重试次数
+	RetryAttempts int `json:"retry_attempts" env:"ETH_RETRY_ATTEMPTS" validate:"min=1"`
+	// 以太坊重试延迟时间
+	RetryDelay int64 `json:"retry_delay" env:"ETH_RETRY_DELAY" validate:"required"`
+	// 以太坊优先级
+	Priority int `json:"priority" env:"ETH_PRIORITY" validate:"min=1"`
 }
 
 // TelegramConfig Telegram Bot配置
