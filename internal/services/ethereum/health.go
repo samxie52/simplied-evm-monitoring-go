@@ -101,11 +101,7 @@ func (hc *HealthChecker) run() {
 	for {
 		select {
 		case <-ticker.C:
-			result := hc.checkClient(hc.client)
-			logger.WithFields(logrus.Fields{
-				"result":    result,
-				"timestamp": time.Now().Format("2006-01-02 15:04:05"),
-			}).Info("Health check result")
+			_ = hc.checkClient(hc.client)
 		case <-hc.stopCh:
 			return
 		}

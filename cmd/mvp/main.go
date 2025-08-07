@@ -39,9 +39,19 @@ func main() {
 		logger.Error("Failed to create Ethereum manager:", err)
 		return
 	}
-	defer manager.Stop()
-	manager.Start()
-	// manager.GetAllTransactionsFromLatestBlock()
+	defer func() {
+		if err := manager.Stop(); err != nil {
+			logger.Error("Failed to stop manager:", err)
+		}
+	}()
+	
+	if err := manager.Start(); err != nil {
+		logger.Error("Failed to start manager:", err)
+		return
+	}
+	
+	// 执行交易检测
+	manager.GetAllTransactionsFromLatestBlock()
 	logger.WithFields(map[string]interface{}{
 		"app_name":  cfg.App.Name,
 		"version":   cfg.App.Version,
