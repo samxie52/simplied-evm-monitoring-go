@@ -1,5 +1,8 @@
 package main
 
+// +build ignore
+// This file is ignored during normal builds to avoid main function conflicts
+
 import (
 	"log"
 	"os"

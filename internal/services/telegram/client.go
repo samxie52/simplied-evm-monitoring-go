@@ -376,11 +376,8 @@ func (tc *TelegramClient) connectionChecker() {
 	ticker := time.NewTicker(tc.config.PingInterval)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			tc.checkConnection()
-		}
+	for range ticker.C {
+		tc.checkConnection()
 	}
 }
 
