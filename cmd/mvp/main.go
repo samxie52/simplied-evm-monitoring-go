@@ -34,24 +34,14 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	client, err := ethereum.NewClient(&cfg.Ethereum, ctx)
+	manager, err := ethereum.NewManager(&cfg.Ethereum)
 	if err != nil {
-		logger.Error("Failed to create Ethereum client:", err)
+		logger.Error("Failed to create Ethereum manager:", err)
 		return
 	}
-	defer client.Close()
-
-	gasService := ethereum.NewGasService(client)
-
-	stats, err := gasService.AnalyzeRecentBlocks(10)
-	if err != nil {
-		logger.Error("Failed to analyze recent blocks:", err)
-		return
-	}
-	logger.WithFields(map[string]interface{}{
-		"stats": stats,
-	}).Info("Gas Price Stats:")
-
+	defer manager.Stop()
+	manager.Start()
+	// manager.GetAllTransactionsFromLatestBlock()
 	logger.WithFields(map[string]interface{}{
 		"app_name":  cfg.App.Name,
 		"version":   cfg.App.Version,

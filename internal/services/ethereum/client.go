@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -18,7 +19,6 @@ import (
 
 // Client 以太坊客户端封装
 type Client struct {
-	ctx context.Context
 	// config: 客户端配置
 	config *config.EthereumConfig
 	// ethClient: 以太坊客户端
@@ -66,7 +66,7 @@ type ClientStats struct {
 }
 
 // NewClient 创建新的以太坊客户端
-func NewClient(config *config.EthereumConfig, ctx context.Context) (*Client, error) {
+func NewClient(config *config.EthereumConfig) (*Client, error) {
 	if config == nil {
 		logger.Error("client config cannot be nil")
 		return nil, fmt.Errorf("client config cannot be nil")
@@ -79,7 +79,6 @@ func NewClient(config *config.EthereumConfig, ctx context.Context) (*Client, err
 
 	client := &Client{
 		config: config,
-		ctx:    ctx,
 	}
 
 	// 建立连接
@@ -95,11 +94,15 @@ func (c *Client) Connect() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// 设置超时
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.config.Timeout)*time.Second)
+	defer cancel()
+
 	var err error
 
 	// 创建RPC客户端
 	// rpc.DialContext(ctx, c.config.URL) 创建一个RPC客户端
-	c.rpcClient, err = rpc.DialContext(c.ctx, c.config.URL)
+	c.rpcClient, err = rpc.DialContext(ctx, c.config.URL)
 	if err != nil {
 		c.lastError = err
 		c.isHealthy = false
@@ -110,7 +113,7 @@ func (c *Client) Connect() error {
 	c.ethClient = ethclient.NewClient(c.rpcClient)
 
 	// 验证连接
-	if err := c.validateConnection(); err != nil {
+	if err := c.validateConnection(ctx); err != nil {
 		c.Close()
 		c.lastError = err
 		c.isHealthy = false
@@ -151,9 +154,9 @@ func (c *Client) Close() {
 }
 
 // validateConnection 验证连接有效性
-func (c *Client) validateConnection() error {
+func (c *Client) validateConnection(ctx context.Context) error {
 	// 获取网络ID
-	networkID, err := c.ethClient.NetworkID(c.ctx)
+	networkID, err := c.ethClient.NetworkID(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get network ID: %w", err)
 	}
@@ -165,7 +168,7 @@ func (c *Client) validateConnection() error {
 	}
 
 	// 获取最新区块号验证节点同步状态
-	_, err = c.ethClient.BlockNumber(c.ctx)
+	_, err = c.ethClient.BlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest block number: %w", err)
 	}
@@ -188,12 +191,12 @@ func detectClientType(url string) config.EthereumClientType {
 }
 
 // GetGasPrice 获取当前Gas价格
-func (c *Client) GetGasPrice() (*big.Int, error) {
+func (c *Client) GetGasPrice(ctx context.Context) (*big.Int, error) {
 	var gasPrice *big.Int
 
-	err := c.ExecuteWithRetry(func() error {
+	err := c.ExecuteWithRetry(ctx, func() error {
 		var err error
-		gasPrice, err = c.ethClient.SuggestGasPrice(c.ctx)
+		gasPrice, err = c.ethClient.SuggestGasPrice(ctx)
 		return err
 	})
 
@@ -201,12 +204,12 @@ func (c *Client) GetGasPrice() (*big.Int, error) {
 }
 
 // GetLatestBlock 获取最新区块
-func (c *Client) GetLatestBlock() (*types.Block, error) {
+func (c *Client) GetLatestBlock(ctx context.Context) (*types.Block, error) {
 	var block *types.Block
 
-	err := c.ExecuteWithRetry(func() error {
+	err := c.ExecuteWithRetry(ctx, func() error {
 		var err error
-		block, err = c.ethClient.BlockByNumber(c.ctx, nil)
+		block, err = c.ethClient.BlockByNumber(ctx, nil)
 		return err
 	})
 
@@ -214,7 +217,7 @@ func (c *Client) GetLatestBlock() (*types.Block, error) {
 }
 
 // ExecuteWithRetry 执行带重试的操作
-func (c *Client) ExecuteWithRetry(operation func() error) error {
+func (c *Client) ExecuteWithRetry(ctx context.Context, operation func() error) error {
 	var lastErr error
 
 	for attempt := 0; attempt <= c.config.RetryAttempts; attempt++ {
@@ -240,8 +243,8 @@ func (c *Client) ExecuteWithRetry(operation func() error) error {
 
 		// 等待重试延迟
 		select {
-		case <-c.ctx.Done():
-			return c.ctx.Err()
+		case <-ctx.Done():
+			return ctx.Err()
 		case <-time.After(time.Duration(c.config.RetryDelay) * time.Duration(attempt+1)):
 			// 指数退避
 		}
@@ -261,12 +264,25 @@ func (c *Client) ExecuteWithRetry(operation func() error) error {
 }
 
 // GetBlockByNumber 根据区块号获取区块
-func (c *Client) GetBlockByNumber(number *big.Int) (*types.Block, error) {
+func (c *Client) GetBlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	var block *types.Block
 
-	err := c.ExecuteWithRetry(func() error {
+	err := c.ExecuteWithRetry(ctx, func() error {
 		var err error
-		block, err = c.ethClient.BlockByNumber(c.ctx, number)
+		block, err = c.ethClient.BlockByNumber(ctx, number)
+		return err
+	})
+
+	return block, err
+}
+
+// GetBlockByHash 根据区块哈希获取区块
+func (c *Client) GetBlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+	var block *types.Block
+
+	err := c.ExecuteWithRetry(ctx, func() error {
+		var err error
+		block, err = c.ethClient.BlockByHash(ctx, hash)
 		return err
 	})
 
@@ -278,4 +294,38 @@ func (c *Client) GetEthClient() *ethclient.Client {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.ethClient
+}
+
+// IsHealthy 检查客户端是否健康
+func (c *Client) IsHealthy() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.isHealthy
+}
+
+// GetTransactionByHash 根据交易哈希获取交易
+func (c *Client) GetTransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error) {
+	var tx *types.Transaction
+	var isPending bool
+
+	err := c.ExecuteWithRetry(ctx, func() error {
+		var err error
+		tx, isPending, err = c.ethClient.TransactionByHash(ctx, hash)
+		return err
+	})
+
+	return tx, isPending, err
+}
+
+// GetTransactionReceipt 获取交易收据
+func (c *Client) GetTransactionReceipt(ctx context.Context, hash common.Hash) (*types.Receipt, error) {
+	var receipt *types.Receipt
+
+	err := c.ExecuteWithRetry(ctx, func() error {
+		var err error
+		receipt, err = c.ethClient.TransactionReceipt(ctx, hash)
+		return err
+	})
+
+	return receipt, err
 }

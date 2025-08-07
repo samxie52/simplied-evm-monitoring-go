@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"simplied-evm-monitoring-go/pkg/logger"
@@ -95,14 +96,14 @@ func NewGasService(client *Client) *GasService {
 }
 
 // GetCurrentGasPrice 获取当前Gas价格
-func (gs *GasService) GetCurrentGasPrice() (*big.Int, error) {
-	return gs.client.GetGasPrice()
+func (gs *GasService) GetCurrentGasPrice(ctx context.Context) (*big.Int, error) {
+	return gs.client.GetGasPrice(ctx)
 }
 
 // GetGasPriceInfo 获取详细的Gas价格信息
-func (gs *GasService) GetGasPriceInfo() (*GasPriceInfo, error) {
+func (gs *GasService) GetGasPriceInfo(ctx context.Context) (*GasPriceInfo, error) {
 	// 获取最新区块
-	latestBlock, err := gs.client.GetLatestBlock()
+	latestBlock, err := gs.client.GetLatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
@@ -112,7 +113,7 @@ func (gs *GasService) GetGasPriceInfo() (*GasPriceInfo, error) {
 	}
 
 	// 获取基础Gas价格
-	gasPrice, err := gs.client.GetGasPrice()
+	gasPrice, err := gs.client.GetGasPrice(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get gas price: %w", err)
 	}
@@ -175,7 +176,7 @@ func (gs *GasService) estimatePriorityFee(block *types.Block) *big.Int {
 }
 
 // MonitorGasPrice 监控Gas价格
-func (gs *GasService) MonitorGasPrice(options *GasMonitorOptions) {
+func (gs *GasService) MonitorGasPrice(ctx context.Context, options *GasMonitorOptions) {
 	if options == nil {
 		options = &GasMonitorOptions{
 			SampleInterval: 5 * time.Second,
@@ -193,17 +194,17 @@ func (gs *GasService) MonitorGasPrice(options *GasMonitorOptions) {
 
 		for {
 			select {
-			case <-gs.client.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				priceInfo, err := gs.GetGasPriceInfo()
+				priceInfo, err := gs.GetGasPriceInfo(ctx)
 				if err != nil {
 					logger.Error("failed to get gas price info: ", err)
 					continue
 				}
 				select {
 				case priceCh <- priceInfo:
-				case <-gs.client.ctx.Done():
+				case <-ctx.Done():
 					return
 				default:
 					logger.Warn("gas price channel is full, dropping price info")
@@ -215,8 +216,8 @@ func (gs *GasService) MonitorGasPrice(options *GasMonitorOptions) {
 }
 
 // GetOptimalGasPrice 获取最优Gas价格
-func (gs *GasService) GetOptimalGasPrice(urgency string) (*big.Int, error) {
-	priceInfo, err := gs.GetGasPriceInfo()
+func (gs *GasService) GetOptimalGasPrice(ctx context.Context, urgency string) (*big.Int, error) {
+	priceInfo, err := gs.GetGasPriceInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -234,12 +235,12 @@ func (gs *GasService) GetOptimalGasPrice(urgency string) (*big.Int, error) {
 }
 
 // AnalyzeRecentBlocks 分析最近区块的Gas使用情况
-func (gs *GasService) AnalyzeRecentBlocks(blockCount int) (*GasPriceStats, error) {
+func (gs *GasService) AnalyzeRecentBlocks(ctx context.Context, blockCount int) (*GasPriceStats, error) {
 	if blockCount <= 0 {
 		blockCount = 10
 	}
 
-	latestBlock, err := gs.client.GetLatestBlock()
+	latestBlock, err := gs.client.GetLatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
@@ -270,7 +271,7 @@ func (gs *GasService) AnalyzeRecentBlocks(blockCount int) (*GasPriceStats, error
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			block, err := gs.client.GetBlockByNumber(blockNum)
+			block, err := gs.client.GetBlockByNumber(ctx, blockNum)
 			if err != nil {
 				logger.WithFields(logrus.Fields{
 					"block_number": blockNum.String(),
@@ -393,12 +394,12 @@ func (gs *GasService) calculateStandardDeviation(prices []*big.Int, mean *big.In
 }
 
 // EstimateGasForTransaction 估算交易Gas费用
-func (gs *GasService) EstimateGasForTransaction(from, to *string, value *big.Int, data []byte) (*GasEstimate, error) {
+func (gs *GasService) EstimateGasForTransaction(ctx context.Context, from, to *string, value *big.Int, data []byte) (*GasEstimate, error) {
 	var gasLimit uint64
 	var err error
 
 	// 估算Gas限制
-	err = gs.client.ExecuteWithRetry(func() error {
+	err = gs.client.ExecuteWithRetry(ctx, func() error {
 		ethClient := gs.client.GetEthClient()
 		if ethClient == nil {
 			return fmt.Errorf("eth client is nil")
@@ -417,7 +418,7 @@ func (gs *GasService) EstimateGasForTransaction(from, to *string, value *big.Int
 		}
 
 		// 估算Gas
-		gasLimit, err = ethClient.EstimateGas(gs.client.ctx, ethereum.CallMsg{
+		gasLimit, err = ethClient.EstimateGas(ctx, ethereum.CallMsg{
 			From:  common.HexToAddress(*from),
 			To:    (*common.Address)(nil),
 			Value: value,
@@ -431,7 +432,7 @@ func (gs *GasService) EstimateGasForTransaction(from, to *string, value *big.Int
 	}
 
 	// 获取当前Gas价格信息
-	gasPriceInfo, err := gs.GetGasPriceInfo()
+	gasPriceInfo, err := gs.GetGasPriceInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get gas price info: %w", err)
 	}
