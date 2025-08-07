@@ -14,8 +14,10 @@ func CORS() gin.HandlerFunc {
 		// 允许的源
 		allowedOrigins := []string{
 			"http://localhost:3000",
+			"http://localhost:5173", // Vite 开发服务器
 			"http://localhost:8080",
 			"http://127.0.0.1:3000",
+			"http://127.0.0.1:5173", // Vite 开发服务器
 			"http://127.0.0.1:8080",
 		}
 
