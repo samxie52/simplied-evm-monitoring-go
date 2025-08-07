@@ -39,6 +39,8 @@ type AlertManager struct {
 type AlertManagerConfig struct {
 	// 大额交易检测配置
 	LargeTransactionConfig *DetectorConfig `json:"large_transaction_config"`
+	// 规则引擎配置
+	RuleEngineConfig *RuleEngineConfig `json:"rule_engine_config"`
 	// 告警队列大小
 	AlertQueueSize int `json:"alert_queue_size"`
 	// 工作协程数量
@@ -71,17 +73,7 @@ type NotificationManager interface {
 	GetSupportedChannels() []models.NotificationChannel
 }
 
-// RuleEngine 规则引擎接口
-type RuleEngine interface {
-	// EvaluateRules 评估规则
-	EvaluateRules(ctx context.Context, data interface{}) ([]*models.Alert, error)
-	// AddRule 添加规则
-	AddRule(ctx context.Context, rule *models.AlertRule) error
-	// RemoveRule 移除规则
-	RemoveRule(ctx context.Context, ruleID uint64) error
-	// GetActiveRules 获取活跃规则
-	GetActiveRules(ctx context.Context) ([]*models.AlertRule, error)
-}
+
 
 // NewAlertManager 创建告警管理器
 func NewAlertManager(config *AlertManagerConfig, alertStore AlertStore, notificationManager NotificationManager) *AlertManager {
@@ -92,6 +84,14 @@ func NewAlertManager(config *AlertManagerConfig, alertStore AlertStore, notifica
 				EnableETHThreshold: true,
 				BatchSize:          50,
 				MaxConcurrency:     5,
+			},
+			RuleEngineConfig: &RuleEngineConfig{
+				EvaluationInterval:          10 * time.Second,
+				MaxConcurrentRules:          10,
+				RuleCacheSize:               1000,
+				EnablePerformanceMonitoring: true,
+				EnablePriorityProcessing:    true,
+				CooldownCheckInterval:       5 * time.Second,
 			},
 			AlertQueueSize: 1000,
 			WorkerCount:    5,
@@ -116,6 +116,12 @@ func NewAlertManager(config *AlertManagerConfig, alertStore AlertStore, notifica
 		am.handleAlert,
 	)
 
+	// 创建规则引擎
+	am.ruleEngine = NewRuleEngine(
+		config.RuleEngineConfig,
+		am.handleAlert,
+	)
+
 	return am
 }
 
@@ -131,6 +137,11 @@ func (am *AlertManager) Start() error {
 	// 启动大额交易检测器
 	if err := am.largeTransactionDetector.Start(); err != nil {
 		return fmt.Errorf("failed to start large transaction detector: %w", err)
+	}
+
+	// 启动规则引擎
+	if err := am.ruleEngine.Start(); err != nil {
+		return fmt.Errorf("failed to start rule engine: %w", err)
 	}
 
 	// 启动告警处理工作协程
@@ -161,6 +172,11 @@ func (am *AlertManager) Stop() error {
 	// 停止大额交易检测器
 	if err := am.largeTransactionDetector.Stop(); err != nil {
 		logger.WithFields(logrus.Fields{"error": err}).Error("Failed to stop large transaction detector")
+	}
+
+	// 停止规则引擎
+	if err := am.ruleEngine.Stop(); err != nil {
+		logger.WithFields(logrus.Fields{"error": err}).Error("Failed to stop rule engine")
 	}
 
 	// 发送停止信号
@@ -329,7 +345,133 @@ func (am *AlertManager) GetStats() map[string]interface{} {
 		stats["large_transaction_detector"] = am.largeTransactionDetector.GetStats()
 	}
 
+	// 添加规则引擎统计
+	if am.ruleEngine != nil {
+		stats["rule_engine"] = am.ruleEngine.GetStats()
+	}
+
 	return stats
+}
+
+// ========== 规则引擎管理方法 ==========
+
+// GetRuleEngine 获取规则引擎
+func (am *AlertManager) GetRuleEngine() *RuleEngine {
+	return am.ruleEngine
+}
+
+// AddRule 添加告警规则
+func (am *AlertManager) AddRule(rule *models.AlertRule) error {
+	if am.ruleEngine == nil {
+		return fmt.Errorf("rule engine not initialized")
+	}
+
+	return am.ruleEngine.AddRule(rule)
+}
+
+// RemoveRule 移除告警规则
+func (am *AlertManager) RemoveRule(ruleID uint64) error {
+	if am.ruleEngine == nil {
+		return fmt.Errorf("rule engine not initialized")
+	}
+
+	return am.ruleEngine.RemoveRule(ruleID)
+}
+
+// UpdateRule 更新告警规则
+func (am *AlertManager) UpdateRule(rule *models.AlertRule) error {
+	if am.ruleEngine == nil {
+		return fmt.Errorf("rule engine not initialized")
+	}
+
+	return am.ruleEngine.UpdateRule(rule)
+}
+
+// GetRule 获取告警规则
+func (am *AlertManager) GetRule(ruleID uint64) (*models.AlertRule, bool) {
+	if am.ruleEngine == nil {
+		return nil, false
+	}
+
+	return am.ruleEngine.GetRule(ruleID)
+}
+
+// GetAllRules 获取所有规则
+func (am *AlertManager) GetAllRules() []*models.AlertRule {
+	if am.ruleEngine == nil {
+		return nil
+	}
+
+	return am.ruleEngine.GetAllRules()
+}
+
+// GetActiveRules 获取激活的规则
+func (am *AlertManager) GetActiveRules() []*models.AlertRule {
+	if am.ruleEngine == nil {
+		return nil
+	}
+
+	return am.ruleEngine.GetActiveRules()
+}
+
+// EvaluateRule 评估单个规则
+func (am *AlertManager) EvaluateRule(ctx context.Context, rule *models.AlertRule, data map[string]interface{}) (*models.Alert, error) {
+	if am.ruleEngine == nil {
+		return nil, fmt.Errorf("rule engine not initialized")
+	}
+
+	return am.ruleEngine.EvaluateRule(ctx, rule, data)
+}
+
+// UpdateRuleEngineConfig 更新规则引擎配置
+func (am *AlertManager) UpdateRuleEngineConfig(config *RuleEngineConfig) error {
+	if am.ruleEngine == nil {
+		return fmt.Errorf("rule engine not initialized")
+	}
+
+	return am.ruleEngine.UpdateConfig(config)
+}
+
+// ProcessRuleEvaluation 处理规则评估数据
+func (am *AlertManager) ProcessRuleEvaluation(ctx context.Context, data map[string]interface{}) error {
+	if am.ruleEngine == nil {
+		return fmt.Errorf("rule engine not initialized")
+	}
+
+	if !am.ruleEngine.IsRunning() {
+		return fmt.Errorf("rule engine is not running")
+	}
+
+	// 获取激活的规则
+	activeRules := am.ruleEngine.GetActiveRules()
+	if len(activeRules) == 0 {
+		return nil
+	}
+
+	// 评估所有激活规则
+	for _, rule := range activeRules {
+		alert, err := am.ruleEngine.EvaluateRule(ctx, rule, data)
+		if err != nil {
+			logger.WithFields(logrus.Fields{
+				"rule_id": rule.ID,
+				"error":   err,
+			}).Error("Failed to evaluate rule")
+			continue
+		}
+
+		if alert != nil {
+			// 规则被触发，处理告警
+			if err := am.handleAlert(alert); err != nil {
+				logger.WithFields(logrus.Fields{
+					"alert_id": alert.ID,
+					"rule_id":  rule.ID,
+					"error":    err,
+				}).Error("Failed to handle rule-triggered alert")
+			}
+		}
+	}
+
+	return nil
 }
 
 // GetQueueStatus 获取队列状态
