@@ -62,27 +62,33 @@
 **文档要求**: 创建 `docs/1.2.md` 包含告警规则引擎设计和使用指南
 **Git Commit**: `feat: implement alert rule engine with dynamic configuration`
 
-## 🤖 第二阶段：Telegram Bot 集成
+## 第二阶段：Telegram Bot 集成
 
-### Step 2.1: Telegram Bot 基础服务
+### Step 2.1: Telegram Bot 基础服务 
 **功能**: 实现 Telegram Bot 核心功能
 **前置条件**: Step 1.2 完成
-**输入依赖**: github.com/go-telegram-bot-api/telegram-bot-api/v5
+**输入依赖**: `github.com/go-telegram-bot-api/telegram-bot-api/v5`
 **实现内容**:
-- 创建 Telegram Bot 服务 (internal/services/telegram/bot.go)
-- 实现消息发送和接收功能
-- 实现基础命令处理框架 (/start, /help, /status)
-- 添加 Bot Token 配置和验证
-- 实现消息发送重试和错误处理机制
+- 创建 Telegram Bot 核心服务 (internal/services/telegram/bot.go)
+- 实现消息发送、接收和命令处理
+- 添加用户权限管理和访问控制
+- 实现消息队列和重试机制
+- 添加基础命令支持 (/start, /help, /status)
+- 实现限流和错误处理机制
+- 添加统计和监控功能
 **输出交付**:
 - internal/services/telegram/bot.go (Telegram Bot 核心服务)
 - internal/services/telegram/commands.go (命令处理器)
 - internal/services/telegram/client.go (Telegram API 客户端)
+- test/telegram/telegram_bot_test.go (完整测试套件)
+- examples/telegram_alert_integration.go (集成示例)
 **验证步骤**:
 - Telegram Bot 连接和认证测试通过
 - 基础命令响应测试通过
 - 消息发送和重试机制测试通过
-**文档要求**: 创建 `docs/2.1.md` 包含 Telegram Bot 配置和基础功能指南
+- 限流和错误处理测试通过
+- 性能基准测试通过 (~107 ns/op 命令处理)
+**文档要求**: 创建 `docs/telegram_integration.md` 包含完整的 Telegram Bot 配置和使用指南
 **Git Commit**: `feat: implement telegram bot core service and commands`
 
 ### Step 2.2: 告警消息格式化和推送
