@@ -196,3 +196,8 @@ func (m *Manager) GetAllTransactionsFromLatestBlock() {
 	}
 
 }
+
+// IsRunning 检查管理器是否运行中
+func (m *Manager) IsRunning() bool {
+	return m.client != nil && m.healthChecker != nil && m.blockService != nil && m.gasService != nil && m.transactionService != nil && m.alertManager != nil
+}

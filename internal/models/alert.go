@@ -24,6 +24,8 @@ type AlertRule struct {
 	Severity AlertSeverity `json:"severity" gorm:"type:varchar(20);index;not null" validate:"required"`
 	// 规则状态
 	Status AlertStatus `json:"status" gorm:"type:varchar(20);index;not null;default:'active'" validate:"required"`
+	//启用状态
+	Enabled bool `json:"enabled" gorm:"default:true"`
 
 	// 规则条件 (JSON 格式存储)
 	Conditions string `json:"conditions" gorm:"type:text;not null" validate:"required"`
@@ -119,6 +121,14 @@ type AlertCondition struct {
 	LogicalOp LogicalOperator `json:"logical_op,omitempty"`
 }
 
+// RuleCondition 规则条件结构（用于API）
+type RuleCondition struct {
+	Field     string      `json:"field" binding:"required"`
+	Operator  string      `json:"operator" binding:"required"`
+	Value     interface{} `json:"value" binding:"required"`
+	LogicalOp string      `json:"logical_op,omitempty"`
+}
+
 // NotificationConfig 通知配置结构
 type NotificationConfig struct {
 	//通知渠道
@@ -211,6 +221,66 @@ func (ar *AlertRule) Validate() error {
 	return nil
 }
 
+// ValidateForAPI 为API创建规则时的简化验证（不验证User字段）
+func (ar *AlertRule) ValidateForAPI() error {
+	// 验证基本字段
+	if ar.Name == "" {
+		return errors.New("rule name is required")
+	}
+	if ar.Type == "" {
+		return errors.New("alert type is required")
+	}
+	if ar.Severity == "" {
+		return errors.New("alert severity is required")
+	}
+	if ar.Status == "" {
+		return errors.New("alert status is required")
+	}
+
+	// 验证告警类型
+	if !ar.Type.IsValid() {
+		return errors.New("invalid alert type")
+	}
+
+	// 验证严重级别
+	if !ar.Severity.IsValid() {
+		return errors.New("invalid alert severity")
+	}
+
+	// 验证状态
+	if !ar.Status.IsValid() {
+		return errors.New("invalid alert status")
+	}
+
+	// 验证操作符
+	if !ar.Operator.IsValid() {
+		return errors.New("invalid comparison operator")
+	}
+
+	// 验证条件 JSON 格式
+	if ar.Conditions != "" {
+		var conditions []AlertCondition
+		if err := json.Unmarshal([]byte(ar.Conditions), &conditions); err != nil {
+			return errors.New("invalid conditions format")
+		}
+
+		// 验证每个条件
+		for _, condition := range conditions {
+			if condition.Field == "" {
+				return errors.New("condition field is required")
+			}
+			if !condition.Operator.IsValid() {
+				return errors.New("invalid condition operator")
+			}
+			if condition.LogicalOp != "" && !condition.LogicalOp.IsValid() {
+				return errors.New("invalid logical operator")
+			}
+		}
+	}
+
+	return nil
+}
+
 // GetConditions 获取解析后的条件
 func (ar *AlertRule) GetConditions() ([]AlertCondition, error) {
 	var conditions []AlertCondition
@@ -293,6 +363,8 @@ func (ar *AlertRule) GetTemplate() string {
 
 	return "告警触发: {{.Title}} - {{.Message}}"
 }
+
+
 
 // EvaluateCondition 评估单个条件
 func (ar *AlertRule) EvaluateCondition(condition AlertCondition, value interface{}) (bool, error) {
