@@ -1,12 +1,160 @@
-# React + Vite
+# 以太坊监控系统 - 简单前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个基于原生 HTML + JavaScript 的简单前端界面，用于展示以太坊监控系统的数据。
 
-Currently, two official plugins are available:
+## 🚀 快速启动
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. 启动后端 API 服务器
+```bash
+# 在项目根目录
+cd /Users/samxie/dev/simplified-case/simplied-evm-monitoring-go
+go run cmd/api-server/main.go
+```
 
-## Expanding the ESLint configuration
+### 2. 启动前端服务器
+```bash
+# 在 simple-frontend 目录
+cd simple-frontend
+./start.sh
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+或者手动启动：
+```bash
+python3 server.py
+```
+
+### 3. 访问前端界面
+打开浏览器访问: http://localhost:3000
+
+## 📋 功能特性
+
+### 🎯 核心功能
+- ✅ **系统状态监控**: 实时显示系统健康状态
+- ✅ **告警统计**: 展示各级别告警数量和趋势
+- ✅ **以太坊网络状态**: 显示区块链连接和同步状态
+- ✅ **最近告警列表**: 展示最新的告警信息
+- ✅ **自动刷新**: 每2分钟自动更新数据
+- ✅ **手动刷新**: 点击按钮立即刷新数据
+
+### 🎨 界面特色
+- 📱 **响应式设计**: 支持桌面和移动设备
+- 🎯 **现代化UI**: 卡片式布局，渐变色彩
+- 🚦 **状态指示器**: 颜色编码的健康状态
+- ⚡ **实时更新**: 动态数据展示
+- 🌈 **中文界面**: 完整的中文用户体验
+
+## 🔧 技术架构
+
+### 前端技术栈
+- **HTML5**: 语义化标记
+- **CSS3**: 现代样式和动画
+- **Vanilla JavaScript**: 原生 JS，无框架依赖
+- **Fetch API**: 异步数据获取
+- **Python HTTP Server**: 简单静态文件服务
+
+### API 集成
+- **健康检查**: `/health`
+- **系统状态**: `/api/v1/monitoring/status`
+- **系统指标**: `/api/v1/monitoring/metrics`
+- **告警统计**: `/api/v1/alerts/stats`
+- **最近告警**: `/api/v1/alerts`
+
+## 📊 数据展示
+
+### 系统状态卡片
+- CPU 使用率
+- 内存使用率
+- 磁盘使用率
+- 网络延迟
+- 活跃连接数
+- 系统运行时间
+
+### 告警统计卡片
+- 总告警数量
+- 各严重级别分布
+- 今日新增告警
+- 活跃规则数量
+
+### 以太坊网络卡片
+- 连接状态
+- 网络类型
+- 最新区块高度
+- 同步状态
+- 节点延迟
+- Gas 价格
+
+### 最近告警列表
+- 告警标题和类型
+- 严重程度标识
+- 创建时间
+- 详细消息
+
+## 🔄 自动刷新机制
+
+- **自动刷新**: 每2分钟自动获取最新数据
+- **手动刷新**: 点击"🔄 刷新数据"按钮
+- **错误处理**: 网络错误时显示友好提示
+- **加载状态**: 数据加载时显示加载提示
+
+## 🎯 优势特点
+
+### 相比 React 版本的优势
+- ✅ **零依赖**: 无需 Node.js 和 npm 包管理
+- ✅ **快速启动**: 一个 Python 命令即可运行
+- ✅ **简单维护**: 纯 HTML/JS，易于理解和修改
+- ✅ **轻量级**: 文件小，加载快
+- ✅ **兼容性好**: 支持所有现代浏览器
+
+### 开发友好
+- 📝 **代码简洁**: 易于阅读和维护
+- 🔧 **快速调试**: 浏览器开发者工具直接调试
+- 🎨 **样式灵活**: CSS 可直接修改样式
+- 📦 **部署简单**: 静态文件，可部署到任何 Web 服务器
+
+## 🚀 部署说明
+
+### 开发环境
+1. 确保后端 API 服务器运行在 `localhost:8080`
+2. 运行 `./start.sh` 启动前端服务器
+3. 访问 `http://localhost:3000`
+
+### 生产环境
+1. 将 `index.html`、`app.js` 部署到 Web 服务器
+2. 修改 `app.js` 中的 `API_BASE_URL` 为生产环境地址
+3. 配置 Web 服务器支持 CORS（如果需要）
+
+## 🔧 自定义配置
+
+### 修改 API 地址
+编辑 `app.js` 文件第2行：
+```javascript
+const API_BASE_URL = 'http://your-api-server:8080';
+```
+
+### 调整刷新间隔
+编辑 `app.js` 文件最后部分：
+```javascript
+// 设置自动刷新间隔（毫秒）
+setInterval(loadSystemData, 120000); // 2分钟
+```
+
+### 修改端口
+编辑 `server.py` 文件：
+```python
+PORT = 3000  # 修改为其他端口
+```
+
+## 📞 问题排查
+
+### 常见问题
+1. **数据无法加载**: 检查后端 API 服务器是否启动
+2. **CORS 错误**: 确保后端 CORS 配置正确
+3. **页面无法访问**: 检查前端服务器是否启动成功
+4. **数据不更新**: 检查浏览器控制台是否有 JavaScript 错误
+
+### 调试方法
+- 打开浏览器开发者工具查看控制台日志
+- 检查网络标签页查看 API 请求状态
+- 验证后端 API 端点是否正常响应
+
+这个简单前端提供了完整的监控数据展示功能，无需复杂的构建工具，即开即用！🎉

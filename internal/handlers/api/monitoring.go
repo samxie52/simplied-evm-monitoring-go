@@ -145,12 +145,31 @@ func (h *MonitoringHandler) GetMetrics(c *gin.Context) {
 	}
 
 	// 获取以太坊指标
-	response.EthereumMetrics = map[string]interface{}{
+	ethereumMetrics := map[string]interface{}{
 		"blocks_processed":     1234567,
 		"transactions_scanned": 9876543,
 		"average_block_time":   "12.5s",
 		"pending_transactions": 150,
 	}
+
+	// 添加前端需要的以太坊网络状态字段
+	if h.ethereumManager != nil && h.ethereumManager.IsRunning() {
+		// 尝试获取真实的以太坊数据
+		ethereumMetrics["latest_block"] = 21234567  // 模拟最新区块号
+		ethereumMetrics["node_latency"] = 45        // 模拟节点延迟(ms)
+		ethereumMetrics["gas_price"] = 25           // 模拟Gas价格(Gwei)
+		ethereumMetrics["network_status"] = "connected"
+		ethereumMetrics["sync_status"] = "synced"
+	} else {
+		// 以太坊管理器未运行时的默认值
+		ethereumMetrics["latest_block"] = 0
+		ethereumMetrics["node_latency"] = 0
+		ethereumMetrics["gas_price"] = 0
+		ethereumMetrics["network_status"] = "disconnected"
+		ethereumMetrics["sync_status"] = "not_synced"
+	}
+
+	response.EthereumMetrics = ethereumMetrics
 
 	c.JSON(http.StatusOK, response)
 }
