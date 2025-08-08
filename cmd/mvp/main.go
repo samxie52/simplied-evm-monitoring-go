@@ -12,6 +12,7 @@ import (
 	"simplied-evm-monitoring-go/internal/handlers"
 	"simplied-evm-monitoring-go/internal/services/alert"
 	"simplied-evm-monitoring-go/internal/services/ethereum"
+	"simplied-evm-monitoring-go/internal/services/telegram"
 	"simplied-evm-monitoring-go/pkg/logger"
 )
 
@@ -101,6 +102,54 @@ func main() {
 		log.Println("Alert manager started successfully")
 	}
 
+	// 创建 Telegram Bot (如果配置了)
+	var telegramBot *telegram.TelegramBot
+	var alertPipeline *alert.AlertPipeline
+	
+	telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if telegramToken != "" {
+		log.Println("Creating Telegram bot...")
+		botConfig := &telegram.BotConfig{
+			Token:                 telegramToken,
+			UpdateTimeout:         60,
+			MessageQueueSize:      1000,
+			MaxConcurrentMessages: 10,
+			AllowedUsers:          []int64{}, // 配置允许的用户ID
+			AdminUsers:            []int64{}, // 配置管理员用户ID
+		}
+		
+		var err error
+		telegramBot, err = telegram.NewTelegramBot(botConfig)
+		if err != nil {
+			log.Printf("Warning: Failed to create telegram bot: %v", err)
+		} else {
+			log.Println("Telegram bot created successfully")
+			
+			// 启动 Telegram Bot
+			if err := telegramBot.Start(); err != nil {
+				log.Printf("Warning: Failed to start telegram bot: %v", err)
+				telegramBot = nil
+			} else {
+				log.Println("Telegram bot started successfully")
+				
+				// 创建告警流水线
+				log.Println("Creating alert pipeline...")
+				pipelineConfig := alert.DefaultPipelineConfig()
+				alertPipeline = alert.NewAlertPipeline(pipelineConfig, alertManager, telegramBot)
+				
+				// 启动告警流水线
+				if err := alertPipeline.Start(); err != nil {
+					log.Printf("Warning: Failed to start alert pipeline: %v", err)
+					alertPipeline = nil
+				} else {
+					log.Println("Alert pipeline started successfully")
+				}
+			}
+		}
+	} else {
+		log.Println("TELEGRAM_BOT_TOKEN not set, skipping Telegram integration")
+	}
+
 	// 创建以太坊管理器
 	log.Println("Creating Ethereum manager...")
 	ethereumManager, err := ethereum.NewManager(&cfg.Ethereum)
@@ -152,6 +201,28 @@ func main() {
 	<-quit
 
 	log.Println("Shutting down server...")
+	
+	// 停止告警流水线
+	if alertPipeline != nil {
+		log.Println("Stopping alert pipeline...")
+		if err := alertPipeline.Stop(); err != nil {
+			log.Printf("Error stopping alert pipeline: %v", err)
+		} else {
+			log.Println("Alert pipeline stopped")
+		}
+	}
+	
+	// 停止 Telegram Bot
+	if telegramBot != nil {
+		log.Println("Stopping telegram bot...")
+		if err := telegramBot.Stop(); err != nil {
+			log.Printf("Error stopping telegram bot: %v", err)
+		} else {
+			log.Println("Telegram bot stopped")
+		}
+	}
+	
+	// 停止服务器
 	if err := server.Stop(); err != nil {
 		log.Printf("Error during server shutdown: %v", err)
 	}
